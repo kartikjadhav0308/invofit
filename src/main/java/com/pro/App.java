@@ -3,6 +3,7 @@ package com.pro;
 import java.sql.*;
 import java.util.Scanner;
 
+// ================= DB CONNECTION =================
 class DbConnection {
     private Connection con;
 
@@ -20,20 +21,23 @@ class DbConnection {
     }
 }
 
+// ================= CUSTOMER SYSTEM =================
 class CustomerSystem {
 
-    Scanner sc = new Scanner(System.in);
+    Scanner sc;
 
-    // ====== CALCULATE TOTAL COST ======
+    public CustomerSystem(Scanner sc) {
+        this.sc = sc;
+    }
+
     private double calculateTotal(Connection con, String[] products, int[] qty) throws SQLException {
         double total = 0;
 
         String sql = "SELECT cost_price FROM product WHERE product_name = ?";
-
         PreparedStatement ps = con.prepareStatement(sql);
 
         for (int i = 0; i < products.length; i++) {
-            ps.setString(1, products[i]);
+            ps.setString(1, products[i].trim());
             ResultSet rs = ps.executeQuery();
 
             if (rs.next()) {
@@ -43,29 +47,25 @@ class CustomerSystem {
         return total;
     }
 
-    // ====== REDUCE INVENTORY ======
     private void updateInventory(Connection con, String[] products, int[] qty) throws SQLException {
-
         String sql = "UPDATE product SET quantity = quantity - ? WHERE product_name = ?";
         PreparedStatement ps = con.prepareStatement(sql);
 
         for (int i = 0; i < products.length; i++) {
             ps.setInt(1, qty[i]);
-            ps.setString(2, products[i]);
+            ps.setString(2, products[i].trim());
             ps.executeUpdate();
         }
     }
 
-    // ====== CUSTOMER INSERT ======
+    // ================= ADD CUSTOMER =================
     public void addCustomer(Connection con) {
         try {
-
-            System.out.println("Enter customer name:");
+            System.out.println("\nEnter customer name:");
             String name = sc.nextLine();
 
             System.out.println("Enter mobile no:");
-            int mobile = sc.nextInt();
-            sc.nextLine();
+            String mobile = sc.nextLine();
 
             System.out.println("Enter product names (comma separated):");
             String productsInput = sc.nextLine();
@@ -73,8 +73,8 @@ class CustomerSystem {
             System.out.println("Enter quantities (comma separated):");
             String qtyInput = sc.nextLine();
 
-            System.out.println("Enter amount paid by customer:");
-            double userPay = sc.nextDouble();
+            System.out.println("Enter amount paid:");
+            double userPay = Double.parseDouble(sc.nextLine().trim());
 
             String[] products = productsInput.split(",");
             String[] qtyStr = qtyInput.split(",");
@@ -86,48 +86,57 @@ class CustomerSystem {
 
             double actualCost = calculateTotal(con, products, qty);
             double profit = userPay - actualCost;
-            double pending = actualCost - userPay;
 
-            // 1. Insert customer
             String insert = "INSERT INTO customer(customer_name, product_name, quantity, mobile_no, purchaseDate) VALUES (?,?,?,?,NOW())";
             PreparedStatement ps = con.prepareStatement(insert);
 
             ps.setString(1, name);
             ps.setString(2, productsInput);
             ps.setString(3, qtyInput);
-            ps.setInt(4, mobile);
+            ps.setString(4, mobile);
             ps.executeUpdate();
 
-            // 2. Update inventory
             updateInventory(con, products, qty);
 
-            // 3. Profit table insert
             String profitSql = "INSERT INTO profit(Date_, profit) VALUES (NOW(), ?)";
             PreparedStatement pp = con.prepareStatement(profitSql);
             pp.setDouble(1, profit);
             pp.executeUpdate();
 
-            // 4. Paylater (if pending exists)
-            if (pending > 0) {
-                String paylaterSql = "INSERT INTO paylater(customer_name, amount_paid, pending_amount, quantity) VALUES (?,?,?,?)";
-                PreparedStatement pl = con.prepareStatement(paylaterSql);
-
-                pl.setString(1, name);
-                pl.setDouble(2, userPay);
-                pl.setDouble(3, pending);
-                pl.setInt(4, qty.length);
-
-                pl.executeUpdate();
-            }
-
             System.out.println("Customer added successfully!");
 
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            System.out.println("Error: " + e.getMessage());
         }
     }
 
-    // ====== VIEW CUSTOMER ======
+    // ================= PAYLATER =================
+    public void addPaylater(Connection con) {
+        try {
+            System.out.println("Enter customer name:");
+            String name = sc.nextLine();
+
+            System.out.println("Enter amount paid:");
+            double paid = Double.parseDouble(sc.nextLine().trim());
+
+            System.out.println("Enter pending amount:");
+            double pending = Double.parseDouble(sc.nextLine().trim());
+
+            String sql = "INSERT INTO paylater(customer_name, amount_paid, pending_amount) VALUES (?,?,?)";
+            PreparedStatement pl = con.prepareStatement(sql);
+
+            pl.setString(1, name);
+            pl.setDouble(2, paid);
+            pl.setDouble(3, pending);
+
+            pl.executeUpdate();
+            System.out.println("Paylater added!");
+
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
     public void viewCustomer(Connection con) {
         try {
             String sql = "SELECT * FROM customer";
@@ -135,13 +144,11 @@ class CustomerSystem {
             ResultSet rs = ps.executeQuery();
 
             while (rs.next()) {
-                System.out.println(
-                        rs.getString(1) + " | " +
-                                rs.getString(2) + " | " +
-                                rs.getString(3) + " | " +
-                                rs.getInt(4) + " | " +
-                                rs.getTimestamp(5)
-                );
+                System.out.println(rs.getString(1) + " | " +
+                        rs.getString(2) + " | " +
+                        rs.getString(3) + " | " +
+                        rs.getString(4) + " | " +
+                        rs.getTimestamp(5));
             }
 
         } catch (Exception e) {
@@ -149,7 +156,6 @@ class CustomerSystem {
         }
     }
 
-    // ====== DELETE CUSTOMER ======
     public void deleteCustomer(Connection con) {
         try {
             System.out.println("Enter customer name:");
@@ -160,14 +166,13 @@ class CustomerSystem {
             ps.setString(1, name);
             ps.executeUpdate();
 
-            System.out.println("Customer deleted");
+            System.out.println("Deleted successfully");
 
         } catch (Exception e) {
             System.out.println(e.getMessage());
         }
     }
 
-    // ====== PAYLATER VIEW ======
     public void viewPaylater(Connection con) {
         try {
             String sql = "SELECT * FROM paylater";
@@ -175,12 +180,9 @@ class CustomerSystem {
             ResultSet rs = ps.executeQuery();
 
             while (rs.next()) {
-                System.out.println(
-                        rs.getString(1) + " | " +
-                                rs.getDouble(2) + " | " +
-                                rs.getDouble(3) + " | " +
-                                rs.getInt(4)
-                );
+                System.out.println(rs.getString(1) + " | " +
+                        rs.getDouble(2) + " | " +
+                        rs.getDouble(3));
             }
 
         } catch (Exception e) {
@@ -188,14 +190,13 @@ class CustomerSystem {
         }
     }
 
-    // ====== UPDATE PAYLATER ======
     public void updatePaylater(Connection con) {
         try {
             System.out.println("Enter customer name:");
             String name = sc.nextLine();
 
-            System.out.println("Enter new paid amount:");
-            double paid = sc.nextDouble();
+            System.out.println("Enter paid amount:");
+            double paid = Double.parseDouble(sc.nextLine().trim());
 
             String sql = "UPDATE paylater SET amount_paid = amount_paid + ?, pending_amount = pending_amount - ? WHERE customer_name = ?";
             PreparedStatement ps = con.prepareStatement(sql);
@@ -205,15 +206,20 @@ class CustomerSystem {
             ps.setString(3, name);
 
             ps.executeUpdate();
+            System.out.println("Updated!");
 
-            System.out.println("Paylater updated!");
+            String deleteSql = "DELETE FROM paylater WHERE customer_name = ? AND pending_amount <= 0";
+            PreparedStatement dp = con.prepareStatement(deleteSql);
+            dp.setString(1, name);
+            dp.executeUpdate();
+
+            System.out.println("Updated! (Auto-removed if fully paid)");
 
         } catch (Exception e) {
             System.out.println(e.getMessage());
         }
     }
 
-    // ====== PROFIT TOTAL (AGGREGATE FUNCTION) ======
     public void totalProfit(Connection con) {
         try {
             String sql = "SELECT SUM(profit) FROM profit";
@@ -230,146 +236,150 @@ class CustomerSystem {
     }
 }
 
-// =============Inventary===========
+// ================= INVENTORY =================
 class Inventory {
 
+    Scanner sc;
+
+    public Inventory(Scanner sc) {
+        this.sc = sc;
+    }
+
     public void invo(Connection con) {
-
         try {
-            Scanner sc = new Scanner(System.in);
-            System.out.println("Product Table operation");
-            mainloop:
-        while(true){
-            System.out.println("1.insert 2.update 3.delete 4.view 5.exit");
+            while (true) {
+                System.out.println("\n1.Insert 2.Update 3.Delete 4.View 5.Exit");
 
-            byte choice = sc.nextByte();
-            sc.nextLine();
-            switch (choice){
-                case 1->{
-                    System.out.println("Enter product name");
-                    String name = sc.nextLine();
-                    System.out.println("Enter quantity of product");
-                    int quantity =sc.nextInt();
-                    System.out.println("Enter the price of product");
-                    double cost = sc.nextDouble();
+                int choice = Integer.parseInt(sc.nextLine().trim());
 
-                    String query ="insert into product(product_name,cost_price,quantity) values (?,?,?)";
-                    PreparedStatement p = con.prepareStatement(query);
-                    p.setString(1,name);
-                    p.setDouble(2,cost);
-                    p.setInt(3,quantity);
-                    p.executeUpdate();
-                    System.out.println("Item add successfully !");
+                switch (choice) {
 
-                }
-
-                case 2->{
-                    System.out.println("Enter 1.update cost 2.update quantity");
-                    byte ch = sc.nextByte();
-                    if(ch == 1){
-                        sc.nextLine();
-                        System.out.println("Enter the name of product");
+                    case 1 -> {
+                        System.out.println("Enter product name:");
                         String name = sc.nextLine();
-                        System.out.println("Enter new cost:");
-                        double cost = sc.nextDouble();
-                        
 
-                        String updateCost = "UPDATE product SET cost_price = ? WHERE product_name = ?";
-                        PreparedStatement ps= con.prepareStatement(updateCost);
-                        ps.setDouble(1, cost);
-                        ps.setString(2, name);
+                        System.out.println("Enter quantity:");
+                        int qty = Integer.parseInt(sc.nextLine());
+
+                        System.out.println("Enter cost:");
+                        double cost = Double.parseDouble(sc.nextLine());
+
+                        String sql = "INSERT INTO product(product_name,cost_price,quantity) VALUES (?,?,?)";
+                        PreparedStatement ps = con.prepareStatement(sql);
+                        ps.setString(1, name);
+                        ps.setDouble(2, cost);
+                        ps.setInt(3, qty);
                         ps.executeUpdate();
-                        System.out.println("Cost updated successfully!");
 
-                    } else if (ch == 2) {
-                        sc.nextLine();
-                        System.out.println("Enter the name of product");
-                        String name = sc.nextLine();
-                        System.out.println("Enter quantity to add:");
-                        int qty = sc.nextInt();
-
-                        String updateQty = "UPDATE product SET quantity = quantity + ? WHERE product_name = ?";
-                        PreparedStatement ps = con.prepareStatement(updateQty);
-                        ps.setInt(1, qty);
-                        ps.setString(2, name);
-
-                        ps.executeUpdate();
-                        System.out.println("Quantity updated successfully!");
+                        System.out.println("Inserted!");
                     }
 
-                }
-                case 3->{
-                    String query = "DELETE FROM product WHERE product_name = ?;";
-                    System.out.println("Enter the name of the product");
-                    String name = sc.nextLine();
-                    PreparedStatement p = con.prepareStatement(query);
-                    p.setString(1,name);
-                    p.executeUpdate();
-                    System.out.println("Item delete successfully");
-                }
-                case 4->{
-                    String query = "Select * from product";
-                    PreparedStatement ps = con.prepareStatement(query);
-                    ResultSet rs = ps.executeQuery();
-                    while(rs.next()){
-                        System.out.println("product_id : "+rs.getInt(1)+" Product_name : "+rs.getString(2)+" Cost : "+rs.getDouble(3)+" quantity : "+rs.getInt(4));
+                    case 2 -> {
+                        System.out.println("1.Update cost 2.Update qty");
+                        int ch = Integer.parseInt(sc.nextLine());
+
+                        if (ch == 1) {
+                            System.out.println("Product name:");
+                            String name = sc.nextLine();
+
+                            System.out.println("New cost:");
+                            double cost = Double.parseDouble(sc.nextLine());
+
+                            String sql = "UPDATE product SET cost_price=? WHERE product_name=?";
+                            PreparedStatement ps = con.prepareStatement(sql);
+                            ps.setDouble(1, cost);
+                            ps.setString(2, name);
+                            ps.executeUpdate();
+
+                            System.out.println("Updated cost!");
+                        } else {
+                            System.out.println("Product name:");
+                            String name = sc.nextLine();
+
+                            System.out.println("Qty to add:");
+                            int qty = Integer.parseInt(sc.nextLine());
+
+                            String sql = "UPDATE product SET quantity = quantity + ? WHERE product_name=?";
+                            PreparedStatement ps = con.prepareStatement(sql);
+                            ps.setInt(1, qty);
+                            ps.setString(2, name);
+                            ps.executeUpdate();
+
+                            System.out.println("Updated qty!");
+                        }
+                    }
+
+                    case 3 -> {
+                        System.out.println("Enter product name:");
+                        String name = sc.nextLine();
+
+                        String sql = "DELETE FROM product WHERE product_name=?";
+                        PreparedStatement ps = con.prepareStatement(sql);
+                        ps.setString(1, name);
+                        ps.executeUpdate();
+
+                        System.out.println("Deleted!");
+                    }
+
+                    case 4 -> {
+                        String sql = "SELECT * FROM product";
+                        PreparedStatement ps = con.prepareStatement(sql);
+                        ResultSet rs = ps.executeQuery();
+
+                        while (rs.next()) {
+                            System.out.println(rs.getInt(1) + " | " +
+                                    rs.getString(2) + " | " +
+                                    rs.getDouble(3) + " | " +
+                                    rs.getInt(4));
+                        }
+                    }
+
+                    case 5 -> {
+                        System.out.println("Exiting inventory...");
+                        return;
                     }
                 }
-                case 5->{
-                    System.out.println("Exit successfully");
-
-                    sc.close();
-                    break mainloop;
-                }
-                default -> {
-                    System.out.println("Enter the invalid choise... Please enter the valid choice ");
-                }
             }
-        }
-            } catch (SQLException ex) {
-            System.out.println(ex.getMessage());
-        }
-        finally {
-            try {
-                con.close();
-                System.out.println("\nconnection close");
-            } catch (Exception e) {
-                System.out.println(e.getMessage());
-            }
-        }
 
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
     }
 }
 
+// ================= MAIN =================
+public class App {
+    public static void main(String[] args) {
 
-public class App 
-{
-    public static void main( String[] args )
-    {
         String url = "jdbc:mysql://localhost:3306/shopdb";
         String username = "root";
         String password = "password";
 
         Scanner sc = new Scanner(System.in);
-        CustomerSystem cs = new CustomerSystem();
+
         DbConnection db = new DbConnection(url, username, password);
-        Inventory inv = new Inventory();
+        CustomerSystem cs = new CustomerSystem(sc);
+        Inventory inv = new Inventory(sc);
 
-        System.out.println("1. Product Menu\n2. Add Customer\n3. View Customer\n4. Delete Customer\n5. Paylater View\n6. Update Paylater\n7. Total Profit\n8. Exit");
+        while (true) {
+            System.out.println("\n1.Product Menu 2.Add Customer 3.View Customer 4.Delete customer 5.Paylater View 6.Update Paylater 7.Profit 8.Add Paylater 9.Exit");
 
-        byte choice = sc.nextByte();
+            int choice = Integer.parseInt(sc.nextLine().trim());
 
-        switch(choice) {
-
-            case 1 -> inv.invo(db.getConnection());
-            case 2 -> cs.addCustomer(db.getConnection());
-            case 3 -> cs.viewCustomer(db.getConnection());
-            case 4 -> cs.deleteCustomer(db.getConnection());
-            case 5 -> cs.viewPaylater(db.getConnection());
-            case 6 -> cs.updatePaylater(db.getConnection());
-            case 7 -> cs.totalProfit(db.getConnection());
-            case 8 -> System.exit(0);
+            switch (choice) {
+                case 1 -> inv.invo(db.getConnection());
+                case 2 -> cs.addCustomer(db.getConnection());
+                case 3 -> cs.viewCustomer(db.getConnection());
+                case 4 -> cs.deleteCustomer(db.getConnection());
+                case 5 -> cs.viewPaylater(db.getConnection());
+                case 6 -> cs.updatePaylater(db.getConnection());
+                case 7 -> cs.totalProfit(db.getConnection());
+                case 8 -> cs.addPaylater(db.getConnection());
+                case 9 -> {
+                    System.out.println("Exited!");
+                    System.exit(0);
+                }
+            }
         }
-
     }
 }
