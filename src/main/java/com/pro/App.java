@@ -383,3 +383,36 @@ public class App {
         }
     }
 }
+
+/*
+CREATE DATABASE IF NOT EXISTS shopdb;
+USE shopdb;
+
+CREATE TABLE product (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_name VARCHAR(100) UNIQUE NOT NULL,
+    cost_price DOUBLE NOT NULL,
+    quantity INT NOT NULL
+);
+
+CREATE TABLE customer (
+    customer_id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_name VARCHAR(100) NOT NULL,
+    product_name TEXT,
+    quantity TEXT,
+    mobile_no VARCHAR(15),
+    purchaseDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE paylater (
+    customer_name VARCHAR(100) PRIMARY KEY,
+    amount_paid DOUBLE NOT NULL,
+    pending_amount DOUBLE NOT NULL
+);
+
+CREATE TABLE profit (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    Date_ TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    profit DOUBLE
+);
+ */
